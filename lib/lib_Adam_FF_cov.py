@@ -30,9 +30,9 @@ class Functions:
         return Functions.beta(params, x)
 
     def diffusion_cov(params, x, diff_type="diagonal"):
-        def softplus_minimal(x, beta=100000000.0, eps=1e-13):
-            #return jax.nn.softplus(beta * x) / beta + eps
-            return jnp.abs(x) + eps
+        def softplus_minimal(x, beta=10.0, eps=1e-13):
+            return jax.nn.softplus(beta * x) / beta + eps
+            #return jnp.abs(x) + eps
             
         cov_vectors = Functions.beta(params, x)
         

@@ -20,6 +20,7 @@ class Functions:
     def S(params, x):
         # hidden layer: (D -> K) with tanh
         h = jnp.tanh(x @ params["W1"] + params["b1"])
+        #h = jax.nn.relu(x @ params["W1"] + params["b1"])
         return h
     
     @jit

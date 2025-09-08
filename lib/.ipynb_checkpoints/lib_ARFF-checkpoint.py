@@ -87,20 +87,19 @@ def nll_loss(drift_param, diff_param, x0, x1, h, diff_type):
     D = x1.shape[1]
     f = Functions.drift(drift_param, x0)
     delta = x1 - x0 - h * f
+    var = Functions.diffusion_cov(diff_param, x0, diff_type) * h 
 
     if diff_type == "diagonal":
-        #Sigma = (jax.nn.softplus(Functions.beta(diff_param, x0)) + EPS) * h
-        Sigma = jnp.abs(Functions.beta(diff_param, x0) * h) + EPS
-        quad = jnp.sum((delta ** 2) / Sigma, axis=1)
-        logdet = jnp.sum(jnp.log(Sigma), axis=1)
+        var_vec = jnp.diagonal(var, axis1=1, axis2=2)
+        quad = jnp.sum((delta ** 2) / var_vec, axis=1)
+        logdet = jnp.sum(jnp.log(var_vec), axis=1)
     else:
-        Sigma = Functions.diffusion_cov(diff_param, x0, diff_type) * h 
         def get_quad_and_logdet(S, d):
             sol, _ = jax.scipy.sparse.linalg.cg(lambda v: S @ v, d, tol=1e-6, maxiter=1e4)
             quad = jnp.dot(d, sol)
             _, ld = jnp.linalg.slogdet(S)
             return quad, ld
-        quad, logdet = jax.vmap(get_quad_and_logdet)(Sigma, delta)
+        quad, logdet = jax.vmap(get_quad_and_logdet)(var, delta)
         
     losses = 0.5 * quad + 0.5 * logdet + 0.5 * D * jnp.log(2.0 * jnp.pi)
     return jnp.mean(losses)

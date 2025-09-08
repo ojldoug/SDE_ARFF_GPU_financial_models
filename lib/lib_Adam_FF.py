@@ -24,7 +24,7 @@ class Functions:
     
     @jit
     def beta(params, x):
-        return (Functions.S(params["omega"], x) @ params["amp"]).real
+        return (Functions.S(params["omega"], x) @ params["amp"])
     
     def drift(params, x):
         # TF model: no internal normalization or z_std/z_mean rescaling
