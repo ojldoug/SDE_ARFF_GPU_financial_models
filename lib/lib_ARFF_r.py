@@ -49,6 +49,7 @@ class Functions:
         return drift_
 
     def diffusion_cov(params, x, diff_type):
+        x = jnp.atleast_2d(x)
         cov_vectors = Functions.beta(params, x)
         
         if diff_type == "diagonal":
@@ -83,11 +84,11 @@ class Functions:
         return jax.vmap(matrix_sqrtm, in_axes=0, out_axes=0)(cov)
 
 
-def nll_loss(drift_param, diff_param, x0, x1, h, diff_type):
-    D = x1.shape[1]
-    f = Functions.drift(drift_param, x0)
-    delta = x1 - x0 - h * f
-    var = Functions.diffusion_cov(diff_param, x0, diff_type) * h 
+def nll_loss(drift_param, diff_param, x, r, h, diff_type):
+    D = r.shape[1]
+    f = Functions.drift(drift_param, x)
+    delta = r - h * f
+    var = Functions.diffusion_cov(diff_param, x, diff_type) * h 
 
     if diff_type == "diagonal":
         var_vec = jnp.diagonal(var, axis1=1, axis2=2)
@@ -122,8 +123,8 @@ class ARFFTrain:
         self.metropolis_test = metropolis_test
        
     @staticmethod
-    def get_Sigma(drift_param, y0, y1, x, h, diff_type):
-        f = y1 - (y0 + h * Functions.drift(drift_param, x))
+    def get_Sigma(drift_param, x, r, h, diff_type):
+        f = r - h * Functions.drift(drift_param, x)
         if diff_type == "diagonal":
             Sigma = f ** 2 / h
         else:
@@ -185,9 +186,9 @@ class ARFFTrain:
         moving_sum = 0
         moving_avg = jnp.zeros(hyperparam.M_max)
         min_moving_avg = jnp.inf
-        moving_avg_len = 5
+        moving_avg_len = 10
         min_index = 0
-        break_iterations = 5
+        break_iterations = 10
         
         for i in range(hyperparam.M_max):
             omega, amp, key = ARFFTrain.ARFF_one_step(key, omega, amp, x, y, 
@@ -228,18 +229,11 @@ class ARFFTrain:
         
         return param, val_errors[:i], moving_avg[:i], end_time-start_time, key
 
-    def train_model(self, key, drift_hyperparam, diff_hyperparam, y0, y1, h, x=None, YinX=True, val_split=0.1, ARFF_val_split=0.1, diff_type="diagonal", plot=True):
-        if x is None:
-            x = y0
-        elif YinX:
-            x = jnp.concatenate((y0, x), axis=1)
-
-        (x, y0, y1), (x_valid, y0_valid, y1_valid), key = split_data(key, val_split, x, y0, y1)
+    def train_model(self, key, drift_hyperparam, diff_hyperparam, x, r, h, val_split=0.1, ARFF_val_split=0.1, diff_type="diagonal", plot=True):
+        (x, r), (x_valid, r_valid), key = split_data(key, val_split, x, r)
 
         # calculate point-wise drift
-        z_start = time.time()
-        z = (y1 - y0)/h
-        z_time = time.time() - z_start
+        z = r/h
 
         # train for z
         drift_param, drift_ve, drift_moving_avg, drift_time, key = ARFFTrain.ARFF_loop(self, key, drift_hyperparam, x, z, ARFF_val_split)
@@ -247,7 +241,7 @@ class ARFFTrain:
             
         # calculate point-wise diffusion
         Sigma_start = time.time()
-        Sigma = ARFFTrain.get_Sigma(drift_param, y0, y1, x, h, diff_type)
+        Sigma = ARFFTrain.get_Sigma(drift_param, x, r, h, diff_type)
         print(np.any(Sigma < 0))
         print(Sigma.shape)
         Sigma_time = time.time() - Sigma_start
@@ -257,9 +251,9 @@ class ARFFTrain:
         plot and plot_loss(diff_ve, diff_moving_avg)
         
         # outputs
-        loss = 1 #nll_loss(drift_param, diff_param, y0, y1, h, diff_type)
-        val_loss = 1 #nll_loss(drift_param, diff_param, y0_valid, y1_valid, h, diff_type)
-        training_time = z_time + drift_time + Sigma_time + diff_time
+        loss = nll_loss(drift_param, diff_param, x, r, h, diff_type)
+        val_loss = nll_loss(drift_param, diff_param, x_valid, r_valid, h, diff_type)
+        training_time = drift_time + Sigma_time + diff_time
         print(f"loss = {loss:.4f}, val_loss = {val_loss:.4f}, time = {training_time:.4f}s")
         
         return drift_param, diff_param, training_time, loss, val_loss, z, Sigma

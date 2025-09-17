@@ -249,6 +249,7 @@ class ARFFTrain:
         Sigma_start = time.time()
         Sigma = ARFFTrain.get_Sigma(drift_param, y0, y1, x, h, diff_type)
         print(np.any(Sigma < 0))
+        print(Sigma.shape)
         Sigma_time = time.time() - Sigma_start
 
         # train for global diffusion
@@ -256,8 +257,8 @@ class ARFFTrain:
         plot and plot_loss(diff_ve, diff_moving_avg)
         
         # outputs
-        loss = nll_loss(drift_param, diff_param, y0, y1, h, diff_type)
-        val_loss = nll_loss(drift_param, diff_param, y0_valid, y1_valid, h, diff_type)
+        loss = 1 #nll_loss(drift_param, diff_param, y0, y1, h, diff_type)
+        val_loss = 1 #nll_loss(drift_param, diff_param, y0_valid, y1_valid, h, diff_type)
         training_time = z_time + drift_time + Sigma_time + diff_time
         print(f"loss = {loss:.4f}, val_loss = {val_loss:.4f}, time = {training_time:.4f}s")
         

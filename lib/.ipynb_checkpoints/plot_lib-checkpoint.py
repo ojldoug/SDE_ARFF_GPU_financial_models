@@ -79,6 +79,7 @@ class PlotResults:
                 plotting_2D(d, z, intermediate, "Training Data", "Intermediate")
     
         plt.show()
+
     
     def plot_ND(self, true_func, param, x, diff_type, z):
         yD = param["amp"].shape[1]
@@ -124,14 +125,14 @@ class PlotResults:
         plt.show()
     
     def plot_trajectories(self, drift_param, diff_param, x_domain, xlim,
-                          n_trajectories, trajectory_time, h, diff_type):
+                          n_trajectories, trajectory_time, h, diff_type, D):
     
         def simulate_euler_maruyama(key, drift_fn, diffusion_fn, x0, h, grid_resolution, xlim):
             """
             Parallel Euler-Maruyama simulation with trajectory termination.
             - xlim: (D, 2) array with min/max per dimension
             """
-            n_trajectories, D = x0.shape
+            n_trajectories = x0.shape[0]
             T = grid_resolution
     
             # Generate all Wiener increments in parallel
@@ -148,6 +149,7 @@ class PlotResults:
                 diffusion = diffusion_fn(x_t).reshape(n_trajectories, D, D)
                 diffusion_term = jnp.einsum('nij,nj->ni', diffusion, dW_t)
                 x_next = x_t + drift * h + diffusion_term
+                print(x_t.shape, x_next.shape)
     
                 # Update alive mask
                 within_limits = jnp.all((x_next >= xlim[:, 0]) & (x_next <= xlim[:, 1]), axis=1)
@@ -175,7 +177,7 @@ class PlotResults:
     
         # Simulate all trajectories
         x = simulate_euler_maruyama(key, drift_fn, diffusion_fn, x0, h, grid_resolution, xlim)
-    
+        print(x.shape)
         # Time vector
         t = jnp.linspace(0, trajectory_time, grid_resolution)
     
